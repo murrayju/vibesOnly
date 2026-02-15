@@ -3,24 +3,382 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>vibesOnly - Admin</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Forge Assessment Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --forge-gold: #D4AF37;
+      --forge-gold-light: #E8C962;
+      --forge-black: #1a1a1a;
+      --forge-dark: #2d2d2d;
+      --forge-gray: #666666;
+      --forge-light: #f5f5f5;
+      --white: #ffffff;
+      --score-high: #4CAF50;
+      --score-mid: #FF9800;
+      --score-low: #f44336;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--forge-light);
+      color: var(--forge-black);
+      min-height: 100vh;
+    }
+
+    .header {
+      background: var(--forge-black);
+      color: var(--white);
+      padding: 20px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .logo {
+      height: 50px;
+    }
+
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .header-subtitle {
+      color: var(--forge-gold);
+      font-size: 0.9rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px;
+    }
+
+    .page-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--forge-black);
+    }
+
+    .page-subtitle {
+      color: var(--forge-gray);
+      margin-bottom: 30px;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 30px;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sessions-list {
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .sessions-header {
+      background: var(--forge-gold);
+      color: var(--forge-black);
+      padding: 15px 20px;
+      font-weight: 600;
+    }
+
+    .session-item {
+      padding: 15px 20px;
+      border-bottom: 1px solid #eee;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .session-item:hover {
+      background: #f9f9f9;
+    }
+
+    .session-item.active {
+      background: #f0f0f0;
+      border-left: 4px solid var(--forge-gold);
+    }
+
+    .session-id {
+      font-weight: 600;
+      color: var(--forge-black);
+      font-size: 0.9rem;
+    }
+
+    .session-date {
+      font-size: 0.8rem;
+      color: var(--forge-gray);
+      margin-top: 4px;
+    }
+
+    .session-summary {
+      font-size: 0.85rem;
+      color: var(--forge-gray);
+      margin-top: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .no-sessions {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--forge-gray);
+    }
+
+    .session-detail {
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .detail-header {
+      background: var(--forge-black);
+      color: var(--white);
+      padding: 20px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .detail-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .detail-date {
+      font-size: 0.9rem;
+      color: var(--forge-gold);
+    }
+
+    .detail-content {
+      padding: 25px;
+    }
+
+    .scores-section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: var(--forge-black);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title::before {
+      content: '';
+      width: 4px;
+      height: 20px;
+      background: var(--forge-gold);
+      border-radius: 2px;
+    }
+
+    .score-cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    @media (max-width: 600px) {
+      .score-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .score-card {
+      background: var(--forge-light);
+      border-radius: 10px;
+      padding: 20px;
+      border: 1px solid #eee;
+    }
+
+    .score-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .score-label {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--forge-black);
+    }
+
+    .score-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .score-value.high { color: var(--score-high); }
+    .score-value.mid { color: var(--score-mid); }
+    .score-value.low { color: var(--score-low); }
+
+    .score-quote {
+      background: var(--white);
+      border-left: 3px solid var(--forge-gold);
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      color: var(--forge-gray);
+      font-style: italic;
+      margin-bottom: 10px;
+    }
+
+    .score-feedback {
+      font-size: 0.85rem;
+      color: var(--forge-black);
+      line-height: 1.5;
+    }
+
+    .overall-section {
+      background: linear-gradient(135deg, var(--forge-black) 0%, var(--forge-dark) 100%);
+      color: var(--white);
+      border-radius: 12px;
+      padding: 25px;
+      margin-bottom: 30px;
+    }
+
+    .overall-label {
+      font-size: 0.85rem;
+      color: var(--forge-gold);
+      font-weight: 600;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .overall-summary {
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+
+    .transcript-section {
+      margin-top: 30px;
+    }
+
+    .transcript-item {
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+    }
+
+    .transcript-item.participant {
+      background: #e3f2fd;
+      margin-left: 30px;
+    }
+
+    .transcript-item.ai {
+      background: #f3e5f5;
+      margin-right: 30px;
+    }
+
+    .transcript-role {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .transcript-item.participant .transcript-role { color: #1976D2; }
+    .transcript-item.ai .transcript-role { color: #7B1FA2; }
+
+    .transcript-text {
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--forge-gray);
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 15px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--forge-gold);
+      color: var(--forge-black);
+    }
+
+    .btn-primary:hover {
+      background: var(--forge-gold-light);
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>vibesOnly Admin</h1>
-      <p class="subtitle">Session Dashboard</p>
-    </header>
-    
-    <main>
-      <div class="view">
-        <h2>Sessions</h2>
-        <div id="sessions-list"></div>
+  <header class="header">
+    <div class="header-left">
+      <img src="https://cdn.prod.website-files.com/6388debd99d0fb3b0185bac5/6388e680493bff193075ac6c_CF%20LOGO%20-%20GOLD%20%2B%20WHITE%20TRANSPARENT.png" alt="Community Forge" class="logo">
+      <div>
+        <h1>Workforce Assessment</h1>
+        <div class="header-subtitle">Community Forge</div>
       </div>
-    </main>
+    </div>
+  </header>
+
+  <div class="container">
+    <h2 class="page-title">Assessment Dashboard</h2>
+    <p class="page-subtitle">Review participant performance and socio-emotional skills</p>
+    
+    <div class="dashboard-grid">
+      <div class="sessions-list">
+        <div class="sessions-header">Sessions</div>
+        <div id="sessions-list">
+          <div class="no-sessions">Loading...</div>
+        </div>
+      </div>
+      
+      <div class="session-detail">
+        <div id="detail-content">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>Select a session to view details</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  
+
   <script src="admin.js"></script>
 </body>
 </html>

@@ -15,6 +15,100 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
+const { exec } = require('child_process');
+const axios = require('axios');
+
+const WHISPER_CLI = '/opt/homebrew/bin/whisper-cli';
+const WHISPER_MODEL = path.join(process.env.HOME || '/Users/coop', '.whisper', 'ggml-base.bin');
+
+app.post('/api/transcribe', (req, res) => {
+  const { audio } = req.body;
+  
+  if (!audio) {
+    return res.status(400).json({ error: 'No audio provided' });
+  }
+  
+  const audioBuffer = Buffer.from(audio, 'base64');
+  const tempWebm = path.join(__dirname, 'temp_input.webm');
+  const tempWav = path.join(__dirname, 'temp_input.wav');
+  const tempTxt = path.join(__dirname, 'temp_output.txt');
+  
+  try {
+    fs.writeFileSync(tempWebm, audioBuffer);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to write audio file' });
+  }
+  
+  const convertCmd = `ffmpeg -i "${tempWebm}" -ar 16000 -ac 1 -c:a pcm_s16le "${tempWav}" 2>/dev/null`;
+  
+  exec(convertCmd, (convError) => {
+    try { fs.unlinkSync(tempWebm); } catch (e) {}
+    
+    if (convError) {
+      console.error('Convert error:', convError.message);
+      return res.status(500).json({ error: 'Failed to convert audio' });
+    }
+    
+    const whisperCmd = `${WHISPER_CLI} -m "${WHISPER_MODEL}" -f "${tempWav}" -otxt > "${tempTxt}" 2>/dev/null`;
+    
+    exec(whisperCmd, (error) => {
+      try { fs.unlinkSync(tempWav); } catch (e) {}
+      
+      if (error) {
+        console.error('Whisper error:', error.message);
+        return res.status(500).json({ error: 'Transcription failed' });
+      }
+      
+      try {
+        const text = fs.readFileSync(tempTxt, 'utf-8').trim();
+        try { fs.unlinkSync(tempTxt); } catch (e) {}
+        res.json({ text });
+      } catch (e) {
+        console.error('Read error:', e);
+        res.status(500).json({ error: 'Failed to read transcription' });
+      }
+    });
+  });
+});
+
+app.post('/api/tts', async (req, res) => {
+  const { text } = req.body;
+  
+  const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+  
+  if (!ELEVENLABS_API_KEY) {
+    return res.status(500).json({ error: 'ElevenLabs API key not configured' });
+  }
+  
+  try {
+    const response = await axios.post(
+      'https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB',
+      {
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5
+        }
+      },
+      {
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': ELEVENLABS_API_KEY
+        },
+        responseType: 'arraybuffer'
+      }
+    );
+    
+    const base64 = Buffer.from(response.data).toString('base64');
+    res.json({ audio: base64, format: 'audio/mpeg' });
+  } catch (error) {
+    console.error('ElevenLabs error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'TTS failed' });
+  }
+});
+
 const DATA_DIR = path.join(__dirname, 'data', 'sessions');
 const SCENARIOS_DIR = path.join(__dirname, 'data', 'scenarios');
 
@@ -102,7 +196,7 @@ app.post('/api/conversation', async (req, res) => {
   try {
     const { transcript, scenario, message } = req.body;
     
-    const systemPrompt = `${scenario.systemPrompt}\n\nYou are roleplaying as: ${scenario.characterName}`;
+    const systemPrompt = `${scenario.systemPrompt}\n\nIMPORTANT: Keep your responses SHORT - 2-5 sentences maximum. Be conversational, not a long speech. You are roleplaying as: ${scenario.characterName}`;
     
     const messages = [];
     
@@ -145,20 +239,39 @@ app.post('/api/sessions/:id/analyze', async (req, res) => {
     
     const transcript = JSON.parse(fs.readFileSync(transcriptPath, 'utf-8'));
     
-    const analysisPrompt = `You are evaluating a participant's performance in a workplace roleplay scenario. 
+    const analysisPrompt = `You are an expert workplace skills assessor. Analyze the transcript below and provide DETAILED feedback with SPECIFIC EXAMPLES from the conversation.
     
-Analyze the following transcript and provide scores (1-5) for each dimension, along with specific feedback:
-
 Transcript:
-${transcript.map(m => `${m.role === 'user' ? 'Participant' : 'AI'}: ${m.content}`).join('\n')}
+${transcript.map(m => `${m.role === 'user' ? 'PARTICIPANT' : 'AI SCENARIO'}: ${m.content}`).join('\n')}
 
-Provide your analysis in this JSON format:
+For each dimension below, provide:
+1. A score from 1-5
+2. Detailed feedback (2-3 sentences) explaining the score
+3. At least one SPECIFIC QUOTE from the transcript that supports your assessment
+
+Return JSON in this exact format:
 {
-  "conflictResolution": { "score": 1-5, "feedback": "..." },
-  "professionalism": { "score": 1-5, "feedback": "..." },
-  "articulation": { "score": 1-5, "feedback": "..." },
-  "learning": { "score": 1-5, "feedback": "..." },
-  "overallSummary": "..."
+  "conflictResolution": { 
+    "score": 1-5, 
+    "quote": "specific quote from transcript",
+    "feedback": "detailed explanation with specific example"
+  },
+  "professionalism": { 
+    "score": 1-5, 
+    "quote": "specific quote from transcript", 
+    "feedback": "detailed explanation with specific example"
+  },
+  "articulation": { 
+    "score": 1-5, 
+    "quote": "specific quote from transcript", 
+    "feedback": "detailed explanation with specific example"
+  },
+  "learning": { 
+    "score": 1-5, 
+    "quote": "specific quote from transcript", 
+    "feedback": "detailed explanation with specific example"
+  },
+  "overallSummary": "2-3 sentence summary of participant performance"
 }`;
     
     const response = await anthropic.messages.create({

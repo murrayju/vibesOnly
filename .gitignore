@@ -1,2 +1,5 @@
 node_modules/
 .env
+data/sessions/
+temp_*.wav
+temp_*.txt
